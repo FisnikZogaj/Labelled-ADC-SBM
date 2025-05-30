@@ -153,8 +153,6 @@ class ADCSBM(DCSBM):
 
         self._add_features()
 
-        self.cluster_labels = cluster_labels
-
 
     def _add_features(self):
         """
@@ -165,12 +163,24 @@ class ADCSBM(DCSBM):
             [x for x in self.X]
             )
         
+        feature_cluster_zip = zip(
+            range(self.n),
+            [c for c in self.cluster_labels]
+            )
+        
         node_feature_dict = dict(node_feature_zip)
+        feature_cluster_dict = dict(feature_cluster_zip)
 
         nx.set_node_attributes(
             G=self.graph,
             values=node_feature_dict, 
             name='features'
+            )
+        
+        nx.set_node_attributes(
+            G=self.graph,
+            values=feature_cluster_dict, 
+            name='feature-cluster'
             )
 
 

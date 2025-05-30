@@ -1,7 +1,10 @@
-from BlockModels import *
-from evals import get_number_of_edges_per_node
-from utils import *
-from plotting import *
+from LADCSBM.blockmodels import (
+    SBM,
+    DCSBM,
+    ADCSBM,
+    LADCSBM
+) 
 
-
-# Graphs from the Block! 😎
+from LADCSBM.evals import *
+from LADCSBM.plotting import *
+from LADCSBM.utils import *

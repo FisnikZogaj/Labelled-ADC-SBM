@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "LADCSBM"
+version = "0.1.0"
+description = "Paket zum Parsen von KVDT-Dateien"
+authors = [
+    {name = "Fisnik Zogaj", email = "fisnik.zogaj97@gmail.com"},
+]
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+dependencies = [
+    "networkx>=3.4.2",
+    "numpy>=2.2.5",
+    "pandas>=2.2.3",
+    "matplotlib>=3.10.1",
+    "scipy>=1.15.2", 
+    "scikit-learn>=1.6.1",
+    "seaborn>=0.13.2"
+]
+
+[project.optional-dependencies]
+dev = ["twine"]
+
+[tool.setuptools]
+packages = ["LADCSBM"]

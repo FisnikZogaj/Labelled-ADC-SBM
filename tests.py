@@ -1,8 +1,9 @@
-from BlockModels import *
-from evals import *
-from utils import *
-from plotting import *
-from utils import generate_B, generate_theta, generate_X
+# from BlockModels import *
+# from src.evals import *
+# from src.utils import *
+# from src.plotting import *
+# from src.utils import generate_B, generate_theta, generate_X
+from blockmodels import *
 
 if __name__=="__main__":
 

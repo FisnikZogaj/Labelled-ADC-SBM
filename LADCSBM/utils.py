@@ -1,8 +1,10 @@
-from scipy.stats import chi2_contingency
+from typing import Tuple
+
 import numpy as np
 import pandas as pd
+from scipy.stats import chi2_contingency
 from sklearn.preprocessing import StandardScaler
-from typing import Tuple
+
 
 
 def CramersV(labels_1, labels_2):
