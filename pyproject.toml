@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "LADCSBM"
 version = "0.1.0"
-description = "Paket zum Parsen von KVDT-Dateien"
+description = "Package for generating synthetic graphs using Stochastic-Block-Models."
 authors = [
     {name = "Fisnik Zogaj", email = "fisnik.zogaj97@gmail.com"},
 ]

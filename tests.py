@@ -1,9 +1,18 @@
-# from BlockModels import *
-# from src.evals import *
-# from src.utils import *
-# from src.plotting import *
-# from src.utils import generate_B, generate_theta, generate_X
-from blockmodels import *
+from collections import Counter
+from typing import List 
+import seaborn as sns
+
+from LADCSBM import DCSBM
+from LADCSBM.utils import (
+    generate_B,
+    generate_X,
+    generate_theta,
+    generate_omega
+    )
+from LADCSBM.evals import *
+from LADCSBM.plotting import *
+
+from graspy.simulations import sbm
 
 if __name__=="__main__":
 
@@ -41,27 +50,27 @@ if __name__=="__main__":
             w_com=3.0
         )
 
-    ladcsbm = LADCSBM(
+    dcsbm = DCSBM(
         community_sizes=community_sizes,
         B=B,
         theta=theta,
-        X=X,
-        cluster_labels=cl
         )
 
-    ladcsbm.set_y_from_X(omega=omega, eps=2.0)
+    my_G = dcsbm.to_Nx()
+    gp_G = sbm(community_sizes, B, dc=theta, loops=False)
 
-    G = ladcsbm.to_Nx()
 
-    com:dict = nx.get_node_attributes(G, 'communities')
-    feat:dict = nx.get_node_attributes(G, 'features')
-    edges:list = G.edges(data=False)
-    targets = nx.get_node_attributes(G, 'targets')
+    
 
-    # print(com, "\n")
-    # print(feat, "\n")
-    # print(edges, "\n")
-    print(targets, "\n")
+    # com:dict = nx.get_node_attributes(G, 'communities')
+    # feat:dict = nx.get_node_attributes(G, 'features')
+    # edges:list = G.edges(data=False)
+    # targets = nx.get_node_attributes(G, 'targets')
 
-    # 1) ---- Scheck edge_distribution per group ----
+    # # print(com, "\n")
+    # # print(feat, "\n")
+    # # print(edges, "\n")
+    # print(targets, "\n")
+
+    # # 1) ---- Scheck edge_distribution per group ----
 
