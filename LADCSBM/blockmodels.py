@@ -1,19 +1,25 @@
-import itertools
-import random
-
 import numpy as np
 import pandas as pd
 import networkx as nx
 
-import matplotlib.pyplot as plt
+from scipy.special import softmax 
 
-from scipy.stats import gaussian_kde
+def _cartprod(*arrays):
+    N = len(arrays)
+    return np.transpose(np.meshgrid(*arrays, indexing="ij"), np.roll(np.arange(N + 1), -1)).reshape(-1, N)
 
-from sklearn.preprocessing import StandardScaler
-from scipy.special import softmax
-from sklearn.manifold import TSNE
+def _symmetrize(graph, method="triu"):
+    if method == "triu":
+        graph = np.triu(graph)
+    elif method == "tril":
+        graph = np.tril(graph)
+    elif method == "avg":
+        graph = (np.triu(graph) + np.tril(graph)) / 2
+    else:
+        raise ValueError("invalid method")
+    graph = graph + graph.T - np.diag(np.diag(graph))
+    return graph
 
-from sklearn.preprocessing import StandardScaler
 
 class SBM:
 
@@ -37,6 +43,7 @@ class SBM:
         self.A = None
         self.graph:nx.Graph = self._gen_graph()
     
+
     def _assign_community_labels(self):
         """
         Assigngs community labels based on the community size vector.
@@ -47,11 +54,14 @@ class SBM:
             in enumerate(self.community_sizes)
             ])
 
+
     def __getattr__(self, name) -> nx.Graph:
         return getattr(self.graph, name)
 
+
     def __repr__(self):
         return str(self.A)
+
 
     def _gen_graph(self):
         """
@@ -73,6 +83,7 @@ class SBM:
 
         return G
 
+
     def to_Nx(self):
         """
         Return the NetworkX Graph. 
@@ -82,49 +93,89 @@ class SBM:
 
 
 class DCSBM(SBM):
+    def __init__(self, community_sizes, B: np.array, theta, rs: int = None):
+        self.theta = np.asarray(theta)
+        super().__init__(community_sizes, B, rs)
 
-    def __init__(self, community_sizes:any, B:np.array, theta:any, model:str='bernoulli', rs:int=None):
-
-        # ---- new params, before parent class is called
-        self.theta = theta
-        self.model = model
-
-        super().__init__(community_sizes, B, rs)        
-        
-        
 
     def _gen_graph(self):
         """
-        Overrides the _gen_graph method from the parent class. Degree Corrected Stochastic Block Model.
+        Graspy(Version: 0.2.0)-like degree-corrected SBM (undirected, no loops).
+        - Uses global np.random so np.random.seed(rs) reproduces graspy.
+        - Only Bernoulli-style sampling (no 'model' choices).
+        - If theta provided, it's normalized per-block and used as selection weights
+          when choosing which pairs become edges (graspy procedure).
         """
-        if self.rs:
+        if self.rs is not None:
             np.random.seed(self.rs)
 
-        rng = np.random.default_rng(seed=self.rs)
-        θ_outer = np.outer(a=self.theta, b=self.theta)
+        n = self.n
+        K = len(self.community_sizes)
 
-        block_probs = self.B[self.community_labels[:, None], self.community_labels[None, :]]
-        P = θ_outer * block_probs
+        # community ranges
+        cmties = []
+        counter = 0
+        for size in self.community_sizes:
+            cmties.append(range(counter, counter + size))
+            counter += size
 
-        if self.model == 'bernoulli':
-            upper = np.triu(rng.random((self.n, self.n)), 1)
-            mask = upper < np.triu(P, 1)
-            self.A = mask + mask.T
+        # prepare dcProbs normalized per block
+        dcProbs = None
+        if self.theta is not None:
+            dcProbs = self.theta.astype(float).copy()
+            for i, indices in enumerate(cmties):
+                idx = np.array(list(indices))
+                s = dcProbs[idx].sum()
+                if s > 0:
+                    dcProbs[idx] = dcProbs[idx] / s
+                else:
+                    dcProbs[idx] = 0.0
 
-        elif self.model == 'poisson':
-            upper = np.triu(rng.poisson(P), 1)
-            self.A = upper + upper.T
+        A = np.zeros((n, n), dtype=int)
+        block_probs = self.B
 
-        else:
-            raise ValueError(f"Unknown model type: {self.model}")
-        
+        for i in range(K):
+            for j in range(i, K):
+                cprod = _cartprod(np.arange(cmties[i].start, cmties[i].stop), np.arange(cmties[j].start, cmties[j].stop))
+                v1 = cprod[:, 0].astype(int)
+                v2 = cprod[:, 1].astype(int)
+                triu = np.ravel_multi_index((v1, v2), (n, n))
+                block_p = block_probs[i, j]
+
+                if len(triu) == 0:
+                    continue
+
+                pchoice = np.random.uniform(size=len(triu))
+                if dcProbs is not None:
+                    num_edges = int((pchoice < block_p).sum())
+                    if num_edges == 0:
+                        continue
+                    edge_dist = dcProbs[v1] * dcProbs[v2]
+                    support = (edge_dist > 0).sum()
+                    if support == 0:
+                        continue
+                    if num_edges > support:
+                        num_edges = support
+                    probs = edge_dist / edge_dist.sum()
+                    chosen = np.random.choice(triu, size=num_edges, replace=False, p=probs)
+                    rr, cc = np.unravel_index(chosen, (n, n))
+                    A[rr, cc] = 1
+                else:
+                    chosen = triu[pchoice < block_p]
+                    if chosen.size == 0:
+                        continue
+                    rr, cc = np.unravel_index(chosen, (n, n))
+                    A[rr, cc] = 1
+
+        # no loops and symmetrize like graspy
+        A = A - np.diag(np.diag(A))
+        A = _symmetrize(A, method="triu")
+        self.A = A.astype(int)
         G = nx.from_numpy_array(self.A)
-
         labels_dict = {i: int(label) for i, label in enumerate(self.community_labels)}
-        nx.set_node_attributes(G=G, values=labels_dict, name='communities')
-        
+        nx.set_node_attributes(G=G, values=labels_dict, name="communities")
         return G
-    
+
 
 
 class ADCSBM(DCSBM):
@@ -251,3 +302,37 @@ class LADCSBM(ADCSBM):
 
 
     
+
+        
+
+    # def _gen_graph(self):
+    #     """
+    #     Overrides the _gen_graph method from the parent class. Degree Corrected Stochastic Block Model.
+    #     """
+    #     if self.rs:
+    #         np.random.seed(self.rs)
+
+    #     rng = np.random.default_rng(seed=self.rs)
+    #     θ_outer = np.outer(a=self.theta, b=self.theta)
+
+    #     block_probs = self.B[self.community_labels[:, None], self.community_labels[None, :]]
+    #     P = θ_outer * block_probs
+
+    #     if self.model == 'bernoulli':
+    #         upper = np.triu(rng.random((self.n, self.n)), 1)
+    #         mask = upper < np.triu(P, 1)
+    #         self.A = mask + mask.T
+
+    #     elif self.model == 'poisson':
+    #         upper = np.triu(rng.poisson(P), 1)
+    #         self.A = upper + upper.T
+
+    #     else:
+    #         raise ValueError(f"Unknown model type: {self.model}")
+        
+    #     G = nx.from_numpy_array(self.A)
+
+    #     labels_dict = {i: int(label) for i, label in enumerate(self.community_labels)}
+    #     nx.set_node_attributes(G=G, values=labels_dict, name='communities')
+        
+    #     return G
